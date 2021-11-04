@@ -91,7 +91,7 @@ if(params.catLanes) {
     process catLanes {
 	    tag "Concatenating lanes into $params.workDir"
 		publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: "*.gz"
-		// label 'small_mem'
+		label 'small_mem'
 		
 		input:
 		tuple val(sampleID), path(R1), path(R2) from inFq_ch
@@ -122,7 +122,7 @@ notSingleSample = !params.singleSample
 
 process trim {
     tag "Trimmomatic on ${pair_id}"
-	// label 'med_mem'
+    label 'med_mem'
 
     input:
     tuple val(pair_id), path(reads) from reads_ch
@@ -139,6 +139,7 @@ process trim {
       ${reads[0]} \
       ${reads[1]} \
       -baseout ${pair_id}_trim \
+	  -threads $tasks.cpus 
       LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
     
     mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
@@ -151,7 +152,7 @@ process trim {
 process fastqc {
     
     tag "FASTQC on ${sample_id}"
-	// label 'small_mem'
+    label 'small_mem'
     
     input:
     tuple val(sample_id), path(reads) from tReadsFqc_ch
@@ -168,7 +169,7 @@ process fastqc {
 
 process bowtieAlign {
     tag "Aliging $pair_id to ${params.bt2_index}"
-	// label 'big_mem'
+    label 'big_mem'
 
     input:
     val(idx) from params.bt2_index
@@ -181,7 +182,7 @@ process bowtieAlign {
 	//TODO: add -p $task.cpus
     script:
     """
-    bowtie2 -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+    bowtie2 -p $tasks.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
     """
 
 }
@@ -190,8 +191,8 @@ process bowtieAlign {
 process filterPrimaryAln {
 
     tag "Filtering ${sampleID}"
-	publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
-	// label 'med_mem'
+    publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
+    label 'med_mem'
 
     input:
     path(blacklist) from params.blacklist
@@ -208,7 +209,7 @@ process filterPrimaryAln {
 	//TODO: modify script for CLI arg $4 to be $task.cpus
     script:
     """
-    processAln.sh ${sampleID} ${bam} ${blacklist}
+    processAln.sh ${sampleID} ${bam} ${blacklist} ${tasks.cpus}
     """
 
 }
@@ -218,7 +219,7 @@ if (notSingleSample) {
     process  plotPCA {
         tag "Creating bin-based Multi-Bam Summary"
         publishDir "$params.outdir/results", mode: 'copy'
-		// label 'med_mem'
+	label 'med_mem'
     
         input:
         path(files) from forPCA_ch.collect()
@@ -235,7 +236,7 @@ if (notSingleSample) {
         do
           sambamba index \$i
         done
-        multiBamSummary bins -b $files -o ${name}_matrix.npz --smartLabels --extendReads
+        multiBamSummary bins -p $task.cpus -b $files -o ${name}_matrix.npz --smartLabels --extendReads
         plotPCA \
           -in ${name}_matrix.npz \
           -o ${name}_PCA.png \
@@ -249,7 +250,7 @@ process makeBigwig{
 
     tag "Creating ${sampleID} bigwig"
     publishDir "$params.outdir/$sampleID", mode: 'copy'
-	// label 'big_mem'
+    label 'big_mem'
 
     input:
     tuple val(sampleID), file(finalBam) from finalBam_ch
@@ -263,13 +264,13 @@ process makeBigwig{
     script:
     """
     sambamba index $finalBam
-    bamCoverage --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --extendReads --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
+    bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --extendReads --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
     """
 }
 
 process computeMatrixDefault {
     tag "${sampleID} generating gene-wide TSS and GB profile matrices"
-	// label 'med_mem'
+    label 'med_mem'
     
     input:
     tuple val(sampleID), file(bigwig) from bigwig_ch
@@ -284,8 +285,8 @@ process computeMatrixDefault {
 	//TODO: add -p $task.cpus
     script:
     """
-    computeMatrix reference-point -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --samplesLabel ${sampleID}
-    computeMatrix scale-regions -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --samplesLabel $sampleID
+    computeMatrix reference-point -p $task.cpus  -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --samplesLabel ${sampleID}
+    computeMatrix scale-regions -p $task.cpus -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --samplesLabel $sampleID
     """
 }
 
@@ -295,7 +296,7 @@ process computeMatrixDefault {
 process generateEnrichPlots {
     tag "${sampleID} TSS and Gene-body Enrichment"
     publishDir "${params.outdir}/results/${sampleID}", mode: 'copy', pattern: "*.pdf"
-	// label 'small_mem'
+    label 'small_mem'
 
     input:
     tuple val(sampleID), file(matrix) from tssMatrixGW_ch
@@ -316,7 +317,7 @@ process generateEnrichPlots {
 process makeGlobalEnrichPlots {
     tag "Project: ${name} TSS and Gene Body Plots"
     publishDir "$params.outdir/results", mode: 'copy', pattern: "*.pdf"
-	// label 'small_mem'
+    label 'small_mem'
     
     input:
     val(name) from params.name
@@ -349,7 +350,7 @@ sortedNamedBam = forBEPImage_ch.toSortedList()
 process generateGlobalFragmentPDF {
     tag "Creating Summary Fragment Histograms"
     publishDir "$params.outdir/results", mode: 'copy'
-	// label 'med_mem'
+    label 'med_mem'
 
     input:
     path(files) from sortedNamedBam
@@ -365,7 +366,7 @@ process generateGlobalFragmentPDF {
     for i in $files; do
       sambamba index \$i
     done
-    bamPEFragmentSize -b ${files} -o ${name}_PEFragHist-all.pdf --samplesLabel ${labels}
+    bamPEFragmentSize -p $task.cpus -b ${files} -o ${name}_PEFragHist-all.pdf --samplesLabel ${labels}
     """
 
 
@@ -386,7 +387,7 @@ if(params.addBEDFilesProfile) {
    
     process computeMatExtra {
         tag "Compute Matrix for ${sampleID} on extra BED file: ${extraBEDName}"
-		// label 'med_mem'
+        label 'med_mem'
         
         input:
         tuple val(extraBEDName), path(BED), val(sampleID), path(bigwig) from totalExtraBed_ch
@@ -398,7 +399,7 @@ if(params.addBEDFilesProfile) {
 		//TODO: add -p $task.cpus
         script:
         """
-        computeMatrix scale-regions -S $bigwig -R $BED -b 3000 -m 8000 -a 3000 --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_profile.npz
+        computeMatrix scale-regions -p $task.cpus -S $bigwig -R $BED -b 3000 -m 8000 -a 3000 --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_profile.npz
         """
     }
     
@@ -407,7 +408,7 @@ if(params.addBEDFilesProfile) {
     process generateExtraBEDProfiles {
         tag "Visualizing read density for ${rName} on sample ${sName}"
         publishDir "$params.outdir/results/extraBED/${sName}", mode: 'copy'
-		// label 'small_mem'
+	label 'small_mem'
 
         input:
         tuple val(rName), val(sName), path(mat) from addBEDMatTuple_ch
@@ -428,7 +429,7 @@ if(params.addBEDFilesProfile) {
     process generateGlobalExtraBED {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-		// label 'small_mem'
+	label 'small_mem'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT_ch
@@ -462,7 +463,7 @@ if(params.addBEDFilesRefPoint) {
    
     process computeMatExtraRP {
         tag "Compute Matrix for ${sampleID} on extra BED file: ${extraBEDName}"
-		// label 'med_mem'
+	label 'med_mem'
         
         input:
         tuple val(extraBEDName), path(BED), val(range), val(pointLabel), val(sampleID), path(bigwig) from totalExtraBed2_ch
@@ -474,7 +475,7 @@ if(params.addBEDFilesRefPoint) {
 		//TODO: add -p $task.cpus
         script:
         """
-        computeMatrix reference-point -S $bigwig -R $BED -b ${range} -a ${range} --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_refPoint.npz
+        computeMatrix reference-point -p $task.cpus -S $bigwig -R $BED -b ${range} -a ${range} --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_refPoint.npz
         """
     }
     
@@ -483,7 +484,7 @@ if(params.addBEDFilesRefPoint) {
     process generateExtraBEDRP {
         tag "Visualizing read density for ${rName} on sample ${sName}"
         publishDir "$params.outdir/results/extraBED/${sName}", mode: 'copy'
-		// label 'small_mem'
+	label 'small_mem'
 
         input:
         tuple val(rName), val(sName), path(mat) from addBEDMatTuple2_ch
@@ -504,7 +505,7 @@ if(params.addBEDFilesRefPoint) {
     process generateGlobalExtraBEDRP {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-		// label 'small_mem'
+	label 'small_mem'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT2_ch
@@ -525,7 +526,7 @@ if(params.addBEDFilesRefPoint) {
 
 process multiqc {
     publishDir "$params.outdir/results", mode:'copy'
-	// label 'small_mem'
+    label 'small_mem'
 
     input:
     path('*') from fastqc_ch
