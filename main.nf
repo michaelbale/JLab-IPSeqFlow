@@ -112,7 +112,8 @@ if(params.catLanes) {
 } else {
     Channel
       .fromFilePairs(params.input)
-      .set {reads_ch}
+      .set {reads_ch, reads2_ch}
+    reads2_ch.view()
 }
 
 notSingleSample = !params.singleSample
