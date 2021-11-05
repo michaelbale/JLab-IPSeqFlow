@@ -122,7 +122,7 @@ notSingleSample = !params.singleSample
 
 process trim {
     tag "Trimmomatic on ${pair_id}"
-    label 'med_mem'
+    //label 'med_mem'
 
     input:
     tuple val(pair_id), path(reads) from reads_ch
