@@ -139,7 +139,7 @@ process trim {
       ${reads[0]} \
       ${reads[1]} \
       -baseout ${pair_id}_trim \
-	  -threads $tasks.cpus 
+	  -threads $task.cpus 
       LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
     
     mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
@@ -182,7 +182,7 @@ process bowtieAlign {
 	//TODO: add -p $task.cpus
     script:
     """
-    bowtie2 -p $tasks.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+    bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
     """
 
 }
@@ -209,7 +209,7 @@ process filterPrimaryAln {
 	//TODO: modify script for CLI arg $4 to be $task.cpus
     script:
     """
-    processAln.sh ${sampleID} ${bam} ${blacklist} ${tasks.cpus}
+    processAln.sh ${sampleID} ${bam} ${blacklist} ${task.cpus}
     """
 
 }
