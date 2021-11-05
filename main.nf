@@ -112,8 +112,7 @@ if(params.catLanes) {
 } else {
     Channel
       .fromFilePairs(params.input)
-      .into {reads_ch; reads2_ch}
-    reads2_ch.view()
+      .set {reads_ch}
 }
 
 notSingleSample = !params.singleSample
@@ -123,7 +122,7 @@ notSingleSample = !params.singleSample
 
 process trim {
     tag "Trimmomatic on ${pair_id}"
-    //label 'med_mem'
+    label 'med_mem'
 
     input:
     tuple val(pair_id), path(reads) from reads_ch
