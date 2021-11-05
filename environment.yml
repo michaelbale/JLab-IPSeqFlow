@@ -4,14 +4,14 @@ channels:
  - bioconda
  - defaults
 dependencies:
- - bioconda::fastqc
- - bioconda::samtools
- - bioconda::picard
- - bioconda::bamtools
- - bioconda::bedtools
- - bioconda::deeptools
- - bioconda::multiqc
- - bioconda::bowtie2
- - bioconda::trimmomatic
- - bioconda::sambamba
- - conda-forge::python
+ - python
+ - fastqc
+ - samtools
+ - picard
+ - bamtools
+ - bedtools
+ - deeptools
+ - multiqc
+ - bowtie2
+ - trimmomatic
+ - sambamba
