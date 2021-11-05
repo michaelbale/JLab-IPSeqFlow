@@ -91,7 +91,7 @@ if(params.catLanes) {
     process catLanes {
 	    tag "Concatenating lanes into $params.workDir"
 		publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: "*.gz"
-		label 'small_mem'
+		// label 'small_mem'
 		
 		input:
 		tuple val(sampleID), path(R1), path(R2) from inFq_ch
@@ -122,7 +122,7 @@ notSingleSample = !params.singleSample
 
 process trim {
     tag "Trimmomatic on ${pair_id}"
-    label 'med_mem'
+    // label 'med_mem'
 
     input:
     tuple val(pair_id), path(reads) from reads_ch
@@ -152,7 +152,7 @@ process trim {
 process fastqc {
     
     tag "FASTQC on ${sample_id}"
-    label 'small_mem'
+    // label 'small_mem'
     
     input:
     tuple val(sample_id), path(reads) from tReadsFqc_ch
@@ -169,7 +169,7 @@ process fastqc {
 
 process bowtieAlign {
     tag "Aliging $pair_id to ${params.bt2_index}"
-    label 'big_mem'
+    // label 'big_mem'
 
     input:
     val(idx) from params.bt2_index
@@ -192,7 +192,7 @@ process filterPrimaryAln {
 
     tag "Filtering ${sampleID}"
     publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
-    label 'med_mem'
+    // label 'med_mem'
 
     input:
     path(blacklist) from params.blacklist
@@ -219,7 +219,7 @@ if (notSingleSample) {
     process  plotPCA {
         tag "Creating bin-based Multi-Bam Summary"
         publishDir "$params.outdir/results", mode: 'copy'
-	label 'med_mem'
+	// label 'med_mem'
     
         input:
         path(files) from forPCA_ch.collect()
@@ -250,7 +250,7 @@ process makeBigwig{
 
     tag "Creating ${sampleID} bigwig"
     publishDir "$params.outdir/$sampleID", mode: 'copy'
-    label 'big_mem'
+    // label 'big_mem'
 
     input:
     tuple val(sampleID), file(finalBam) from finalBam_ch
@@ -270,7 +270,7 @@ process makeBigwig{
 
 process computeMatrixDefault {
     tag "${sampleID} generating gene-wide TSS and GB profile matrices"
-    label 'med_mem'
+    // label 'med_mem'
     
     input:
     tuple val(sampleID), file(bigwig) from bigwig_ch
@@ -296,7 +296,7 @@ process computeMatrixDefault {
 process generateEnrichPlots {
     tag "${sampleID} TSS and Gene-body Enrichment"
     publishDir "${params.outdir}/results/${sampleID}", mode: 'copy', pattern: "*.pdf"
-    label 'small_mem'
+    // label 'small_mem'
 
     input:
     tuple val(sampleID), file(matrix) from tssMatrixGW_ch
@@ -317,7 +317,7 @@ process generateEnrichPlots {
 process makeGlobalEnrichPlots {
     tag "Project: ${name} TSS and Gene Body Plots"
     publishDir "$params.outdir/results", mode: 'copy', pattern: "*.pdf"
-    label 'small_mem'
+    // label 'small_mem'
     
     input:
     val(name) from params.name
@@ -350,7 +350,7 @@ sortedNamedBam = forBEPImage_ch.toSortedList()
 process generateGlobalFragmentPDF {
     tag "Creating Summary Fragment Histograms"
     publishDir "$params.outdir/results", mode: 'copy'
-    label 'med_mem'
+    // label 'med_mem'
 
     input:
     path(files) from sortedNamedBam
@@ -387,7 +387,7 @@ if(params.addBEDFilesProfile) {
    
     process computeMatExtra {
         tag "Compute Matrix for ${sampleID} on extra BED file: ${extraBEDName}"
-        label 'med_mem'
+        // label 'med_mem'
         
         input:
         tuple val(extraBEDName), path(BED), val(sampleID), path(bigwig) from totalExtraBed_ch
@@ -408,7 +408,7 @@ if(params.addBEDFilesProfile) {
     process generateExtraBEDProfiles {
         tag "Visualizing read density for ${rName} on sample ${sName}"
         publishDir "$params.outdir/results/extraBED/${sName}", mode: 'copy'
-	label 'small_mem'
+	// label 'small_mem'
 
         input:
         tuple val(rName), val(sName), path(mat) from addBEDMatTuple_ch
@@ -429,7 +429,7 @@ if(params.addBEDFilesProfile) {
     process generateGlobalExtraBED {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-	label 'small_mem'
+	// label 'small_mem'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT_ch
@@ -463,7 +463,7 @@ if(params.addBEDFilesRefPoint) {
    
     process computeMatExtraRP {
         tag "Compute Matrix for ${sampleID} on extra BED file: ${extraBEDName}"
-	label 'med_mem'
+	// label 'med_mem'
         
         input:
         tuple val(extraBEDName), path(BED), val(range), val(pointLabel), val(sampleID), path(bigwig) from totalExtraBed2_ch
@@ -484,7 +484,7 @@ if(params.addBEDFilesRefPoint) {
     process generateExtraBEDRP {
         tag "Visualizing read density for ${rName} on sample ${sName}"
         publishDir "$params.outdir/results/extraBED/${sName}", mode: 'copy'
-	label 'small_mem'
+	// label 'small_mem'
 
         input:
         tuple val(rName), val(sName), path(mat) from addBEDMatTuple2_ch
@@ -505,7 +505,7 @@ if(params.addBEDFilesRefPoint) {
     process generateGlobalExtraBEDRP {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-	label 'small_mem'
+	// label 'small_mem'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT2_ch
@@ -526,7 +526,7 @@ if(params.addBEDFilesRefPoint) {
 
 process multiqc {
     publishDir "$params.outdir/results", mode:'copy'
-    label 'small_mem'
+    // label 'small_mem'
 
     input:
     path('*') from fastqc_ch
