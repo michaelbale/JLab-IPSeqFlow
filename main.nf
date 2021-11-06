@@ -6,6 +6,7 @@ params.blacklist = params.genome ? params.genomes[ params.genome ].blacklist ?: 
 params.genesList = params.genome ? params.genomes[ params.genome ].genesList ?: false : false
 
 
+
 version = 0.5
 
 
@@ -64,17 +65,6 @@ log.info """\
          .stripIndent()
 		 
 		 
-
-
-
-
-
-
-
-
-
-
-
 if(params.catLanes) {
 
     getSampleID = {
@@ -122,7 +112,7 @@ notSingleSample = !params.singleSample
 
 process trim {
     tag "Trimmomatic on ${pair_id}"
-    // label 'med_mem'
+    label 'med_mem'
 
     input:
     tuple val(pair_id), path(reads) from reads_ch
@@ -136,10 +126,10 @@ process trim {
     script:
     """
     trimmomatic PE \
+	  -threads $task.cpus \
       ${reads[0]} \
       ${reads[1]} \
       -baseout ${pair_id}_trim \
-	  -threads $task.cpus 
       LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
     
     mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
@@ -245,6 +235,7 @@ if (notSingleSample) {
 
     }
 }
+
 
 process makeBigwig{
 
@@ -545,3 +536,4 @@ process multiqc {
     multiqc .
     """
 }
+
