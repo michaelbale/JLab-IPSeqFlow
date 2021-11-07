@@ -276,8 +276,8 @@ process computeMatrixDefault {
 	//TODO: add -p $task.cpus
     script:
     """
-    computeMatrix reference-point -p $task.cpus  -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --missingDataAsZeros --samplesLabel ${sampleID}
-    computeMatrix scale-regions -p $task.cpus -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --missingDataAsZeros --samplesLabel $sampleID
+    computeMatrix reference-point -p $task.cpus  -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --missingDataAsZero --samplesLabel ${sampleID}
+    computeMatrix scale-regions -p $task.cpus -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --missingDataAsZero --samplesLabel $sampleID
     """
 }
 
