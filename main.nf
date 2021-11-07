@@ -276,8 +276,8 @@ process computeMatrixDefault {
 	//TODO: add -p $task.cpus
     script:
     """
-    computeMatrix reference-point -p $task.cpus  -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --samplesLabel ${sampleID}
-    computeMatrix scale-regions -p $task.cpus -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --samplesLabel $sampleID
+    computeMatrix reference-point -p $task.cpus  -S $bigwig -R $genes -o ${sampleID}_rpMat.npz -b 3000 -a 3000 --missingDataAsZeros --samplesLabel ${sampleID}
+    computeMatrix scale-regions -p $task.cpus -S $bigwig -R $genes -o ${sampleID}_srMat.npz -m 8000 -b 3000 -a 3000 --missingDataAsZeros --samplesLabel $sampleID
     """
 }
 
@@ -390,7 +390,7 @@ if(params.addBEDFilesProfile) {
 		//TODO: add -p $task.cpus
         script:
         """
-        computeMatrix scale-regions -p $task.cpus -S $bigwig -R $BED -b 3000 -m 8000 -a 3000 --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_profile.npz
+        computeMatrix scale-regions -p $task.cpus -S $bigwig -R $BED -b 3000 -m 8000 -a 3000 --missingDataAsZero --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_profile.npz
         """
     }
     
@@ -466,7 +466,7 @@ if(params.addBEDFilesRefPoint) {
 		//TODO: add -p $task.cpus
         script:
         """
-        computeMatrix reference-point -p $task.cpus -S $bigwig -R $BED -b ${range} -a ${range} --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_refPoint.npz
+        computeMatrix reference-point -p $task.cpus -S $bigwig -R $BED -b ${range} -a ${range} --missingDataAsZero --samplesLabel ${sampleID} -o ${sampleID}-${extraBEDName}_refPoint.npz
         """
     }
     
