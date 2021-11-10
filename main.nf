@@ -209,7 +209,7 @@ if (notSingleSample) {
     process  plotPCA {
         tag "Creating bin-based Multi-Bam Summary"
         publishDir "$params.outdir/results", mode: 'copy'
-	label 'med_mem'
+	label 'massive_mem'
     
         input:
         path(files) from forPCA_ch.collect()
@@ -308,7 +308,7 @@ process generateEnrichPlots {
 process makeGlobalEnrichPlots {
     tag "Project: ${name} TSS and Gene Body Plots"
     publishDir "$params.outdir/results", mode: 'copy', pattern: "*.pdf"
-    label 'small_mem'
+    label 'largeStore'
     
     input:
     val(name) from params.name
@@ -420,7 +420,7 @@ if(params.addBEDFilesProfile) {
     process generateGlobalExtraBED {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-	    label 'small_mem'
+	    label 'largeStore'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT_ch
@@ -496,7 +496,7 @@ if(params.addBEDFilesRefPoint) {
     process generateGlobalExtraBEDRP {
         tag "Combining profile plots for ${rName}"
         publishDir "$params.outdir/results/extraBED", mode: 'copy', pattern: "*.pdf"
-	    label 'small_mem'
+	    label 'largeStore'
     
         input:
         tuple val(rName), path(mats) from mixedExtraBEDsGT2_ch
