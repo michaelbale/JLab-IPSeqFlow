@@ -182,7 +182,7 @@ process filterPrimaryAln {
 
     tag "Filtering ${sampleID}"
     publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
-    label 'med_mem'
+    label 'big_mem'
 
     input:
     path(blacklist) from params.blacklist
