@@ -30,7 +30,13 @@ samtools idxstats $out2 > ${SAMPLE}_idxstats.log
 out2m=$(echo $out1 | sed 's/\.bam$/.nodup.noM.temp.bam/')
 out3=$(echo $out1 | sed 's/\.bam$/.nodup.noM.bam/')
 export CHROMOSOMES=$(samtools view -H $out2 | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
-samtools view -b -h -f 3 -F 4 -F 8 -F 256 -F 1024 -F 2048 -q 30 $out2 $CHROMOSOMES > ${out3}	
+
+if [[ $MODE = "PE" ]]
+then 
+  samtools view -b -h -f 3 -F 4 -F 8 -F 256 -F 1024 -F 2048 -q 30 $out2 $CHROMOSOMES > ${out3}	
+else
+  samtools view -b -h -F 4 -F 256 -F 1024 -F 2048 -q 30 $out2 $CHROMOSOMES > ${out3}
+fi
 samtools index $out3
 out4=$(echo $out1 | sed 's/\.bam$/.nodup.noM.black.bam/')
 bedtools subtract -A -a ${out3} -b $BLACK > ${out4}	
