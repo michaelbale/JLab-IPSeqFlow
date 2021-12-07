@@ -2,9 +2,10 @@
 
 # read from command line the unfiltered and unsortde bam file
 
-SAMPLE=$1
-p1=$2
-BLACK=$3
+MODE=$1
+SAMPLE=$2
+p1=$3
+BLACK=$4
 
 
 out1prefix=$(echo $p1 | sed 's/\.bam$//')
@@ -38,10 +39,13 @@ samtools index ${out4}
 finalPrefix=$(basename "$p1" .bam)
 sambamba sort --out ${SAMPLE}_final.bam ${out4}
 
-picard CollectInsertSizeMetrics \
-	I=${SAMPLE}_final.bam \
-	O=${SAMPLE}_insertSizes.log \
-	H=${SAMPLE}_insertHist.pdf
+if [[ $MODE = "PE" ]]
+then
+	picard CollectInsertSizeMetrics \
+		I=${SAMPLE}_final.bam \
+		O=${SAMPLE}_insertSizes.log \
+		H=${SAMPLE}_insertHist.pdf
+fi
 
 rm $out1 $out2 $out3 $out4 *bai 
 

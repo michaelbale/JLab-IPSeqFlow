@@ -35,6 +35,7 @@ def helpMessage() {
 	  --workDir                     Name of folder to output concatenated fastq files to (not used unless --catLanes)
 	  --outdir                      Name of folder to output all results to
 	  --genomeAssets                Home directory of where genome-specific files are. Defaults to /athena/josefowiczlab/scratch/szj2001/JLab-Flow_Genomes
+	  --singleEnd                   Denotes read input are single read instead of paired end sequencing
     """.stripIndent()
 }
 
@@ -70,15 +71,42 @@ if(params.catLanes) {
     getSampleID = {
 	    (it =~ /(.+)_S\d+_L\d{3}/)[0][1]
 	}
+    
+	if(params.singleEnd) {
 	
-	Channel
+	  print("y u do dis 2 me andrew")
+	    Channel
+		  .fromPath(params.input)
+		  .map { path -> tuple(getSampleID(path.getName()), path)}
+		  .groupTuple()
+		  .set { inFq_ch }
+		
+		process catLanesSE {
+		  tag "Concatenating lanes into $params.workDir"
+		  publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: '*.gz'
+		  label 'small_mem'
+		  
+		  input:
+		  tuple val(sampleID), path(r1) from inFq_ch
+		  
+		  output:
+		  tuple val(sampleID), path("${sampleID}_R1_init.fq.gz") into reads_ch
+		  
+		  script:
+		  """
+		  zcat $r1 > ${sampleID}_R1_init.fq
+		  gzip  ${sampleID}_R1_init.fq
+		  """
+		}
+	} else {
+	  Channel
 	  .fromFilePairs(params.input, flat: true)
 	  .map { prefix, r1, r2 -> tuple(getSampleID(prefix), r1, r2) }
 	  .groupTuple()
 	  .set {inFq_ch}
 	
 
-    process catLanes {
+      process catLanes {
 	    tag "Concatenating lanes into $params.workDir"
 		publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: "*.gz"
 		label 'small_mem'
@@ -97,113 +125,318 @@ if(params.catLanes) {
 		gzip ${sampleID}_R1_init.fq
 		gzip ${sampleID}_R2_init.fq
 		"""
+	  }
 	}
-	
 } else {
     Channel
       .fromFilePairs(params.input)
       .set {reads_ch}
 }
 
+
+if(params.singleEnd){
+	process trimSE {
+		tag "Trimmomatic on ${pair_id}"
+		label 'med_mem'
+
+		input:
+		tuple val(pair_id), path(reads) from reads_ch
+		
+		output:
+		path("${pair_id}_trim.log") into trimmomaticLogs_ch
+		tuple pair_id, path("${pair_id}*.fastq.gz") into trimmedReads_ch, tReadsFqc_ch
+
+		//TODO: add -threads $task.cpus
+		//TODO: look into fastp as alternative trimmer to handle poly-G artefacts
+		script:
+		"""
+		trimmomatic SE \
+		  -threads $task.cpus \
+		  ${reads[0]} \
+		  ${pair_id}_trim_1P \
+		  LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
+		
+		mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
+		gzip ${pair_id}_trim_R1.fastq
+		"""
+	}
+
+	process fastqcSE {
+		
+		tag "FASTQC on ${sample_id}"
+		label 'small_mem'
+		
+		input:
+		tuple val(sample_id), path(reads) from tReadsFqc_ch
+
+		output:
+		path("fastqc_${sample_id}_logs") into fastqc_ch
+
+		script:
+		"""
+		mkdir fastqc_${sample_id}_logs
+		fastqc -o fastqc_${sample_id}_logs -f fastq -q ${reads}
+		"""  
+	} 
+
+	process bowtieAlignSE {
+		tag "Aliging $pair_id to ${params.bt2_index}"
+		label 'big_mem'
+
+		input:
+		val(idx) from params.bt2_index
+		tuple val(pair_id), path(reads) from trimmedReads_ch
+
+		output:
+		path("${pair_id}_bt2.log") into bt2Logs_ch
+		tuple pair_id, file("${pair_id}_init.bam") into bt2Bam_ch
+
+		//TODO: add -p $task.cpus
+		script:
+		"""
+		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -U ${reads} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+		"""
+
+	}
+
+
+	process filterPrimaryAlnSE {
+
+		tag "Filtering ${sampleID}"
+		publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
+		label 'big_mem'
+
+		input:
+		path(blacklist) from params.blacklist
+		tuple val(sampleID), path(bam) from bt2Bam_ch
+
+		output:
+		path("${sampleID}_idxstats.log") into idxstats_ch
+		path("${sampleID}_dups.log") into picardDupStats_ch
+		tuple sampleID, file("${sampleID}_final.bam") into finalBam_ch
+		file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
+		val(sampleID) into names_ch
+		
+		//TODO: modify script for CLI arg $4 to be $task.cpus
+		script:
+		"""
+		processAln.sh SE ${sampleID} ${bam} ${blacklist} ${task.cpus}
+		"""
+
+	}
+
+	process makeBigwigSE{
+
+		tag "Creating ${sampleID} bigwig"
+		publishDir "$params.outdir/$sampleID", mode: 'copy'
+		label 'big_mem'
+
+		input:
+		tuple val(sampleID), file(finalBam) from finalBam_ch
+		
+		output:
+		tuple val(sampleID), file("${sampleID}_CPMnorm.bw") into bigwig_ch, bigwig2_ch, bigwig3_ch
+		val(sampleID) into labels_ch
+		file("${sampleID}_CPMnorm.bw") into forGEnrichPlot_ch
+
+		//TODO: add -p $task.cpus
+		script:
+		"""
+		sambamba index $finalBam
+		bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
+		"""
+	}
+
+
+
+	process multiqcSE {
+		publishDir "$params.outdir/results", mode:'copy'
+		label 'small_mem'
+
+		input:
+		path('*') from fastqc_ch
+		  .mix(idxstats_ch)
+		  .mix(picardDupStats_ch)
+		  .mix(trimmomaticLogs_ch)
+		  .mix(bt2Logs_ch)
+		  .collect()
+		
+		output:
+		path('multiqc_report.html')
+
+		script:
+		"""
+		multiqc .
+		"""
+	}
+} else {
+	process trim {
+		tag "Trimmomatic on ${pair_id}"
+		label 'med_mem'
+
+		input:
+		tuple val(pair_id), path(reads) from reads_ch
+		
+		output:
+		path("${pair_id}_trim.log") into trimmomaticLogs_ch
+		tuple pair_id, path("${pair_id}*.fastq.gz") into trimmedReads_ch, tReadsFqc_ch
+
+		//TODO: add -threads $task.cpus
+		//TODO: look into fastp as alternative trimmer to handle poly-G artefacts
+		script:
+		"""
+		trimmomatic PE \
+		  -threads $task.cpus \
+		  ${reads[0]} \
+		  ${reads[1]} \
+		  -baseout ${pair_id}_trim \
+		  LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
+		
+		mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
+		mv ${pair_id}_trim_2P ${pair_id}_trim_R2.fastq
+		gzip ${pair_id}_trim_R1.fastq
+		gzip ${pair_id}_trim_R2.fastq
+		"""
+	}
+
+	process fastqc {
+		
+		tag "FASTQC on ${sample_id}"
+		label 'small_mem'
+		
+		input:
+		tuple val(sample_id), path(reads) from tReadsFqc_ch
+
+		output:
+		path("fastqc_${sample_id}_logs") into fastqc_ch
+
+		script:
+		"""
+		mkdir fastqc_${sample_id}_logs
+		fastqc -o fastqc_${sample_id}_logs -f fastq -q ${reads}
+		"""  
+	} 
+
+	process bowtieAlign {
+		tag "Aliging $pair_id to ${params.bt2_index}"
+		label 'big_mem'
+
+		input:
+		val(idx) from params.bt2_index
+		tuple val(pair_id), path(reads) from trimmedReads_ch
+
+		output:
+		path("${pair_id}_bt2.log") into bt2Logs_ch
+		tuple pair_id, file("${pair_id}_init.bam") into bt2Bam_ch
+
+		//TODO: add -p $task.cpus
+		script:
+		"""
+		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+		"""
+
+	}
+
+
+	process filterPrimaryAln {
+
+		tag "Filtering ${sampleID}"
+		publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
+		label 'big_mem'
+
+		input:
+		path(blacklist) from params.blacklist
+		tuple val(sampleID), path(bam) from bt2Bam_ch
+
+		output:
+		path("${sampleID}_idxstats.log") into idxstats_ch
+		path("${sampleID}_insertSizes.log") into picardISStats_ch
+		path("${sampleID}_dups.log") into picardDupStats_ch
+		tuple sampleID, file("${sampleID}_final.bam") into finalBam_ch
+		file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
+		val(sampleID) into names_ch
+		
+		//TODO: modify script for CLI arg $4 to be $task.cpus
+		script:
+		"""
+		processAln.sh PE ${sampleID} ${bam} ${blacklist} ${task.cpus}
+		"""
+
+	}
+
+	process makeBigwig{
+
+		tag "Creating ${sampleID} bigwig"
+		publishDir "$params.outdir/$sampleID", mode: 'copy'
+		label 'big_mem'
+
+		input:
+		tuple val(sampleID), file(finalBam) from finalBam_ch
+		
+		output:
+		tuple val(sampleID), file("${sampleID}_CPMnorm.bw") into bigwig_ch, bigwig2_ch, bigwig3_ch
+		val(sampleID) into labels_ch
+		file("${sampleID}_CPMnorm.bw") into forGEnrichPlot_ch
+
+		//TODO: add -p $task.cpus
+		script:
+		"""
+		sambamba index $finalBam
+		bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --extendReads --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
+		"""
+	}
+
+	BEFPDF_ch = names_ch.toSortedList()
+	sortedNamedBam = forBEPImage_ch.toSortedList()
+
+
+	process generateGlobalFragmentPDF {
+		tag "Creating Summary Fragment Histograms"
+		publishDir "$params.outdir/results", mode: 'copy'
+		label 'med_mem'
+
+		input:
+		path(files) from sortedNamedBam
+		val(labels) from BEFPDF_ch
+		val(name) from params.name
+
+		output:
+		file( "${name}_PEFragHist-all.pdf" )
+		
+		//TODO: add -p $task.cpus
+		script:
+		"""
+		for i in $files; do
+		  sambamba index \$i
+		done
+		bamPEFragmentSize -p $task.cpus -b ${files} -o ${name}_PEFragHist-all.pdf --samplesLabel ${labels}
+		"""
+	}
+
+	process multiqc {
+		publishDir "$params.outdir/results", mode:'copy'
+		label 'small_mem'
+
+		input:
+		path('*') from fastqc_ch
+		  .mix(idxstats_ch)
+		  .mix(picardISStats_ch)
+		  .mix(picardDupStats_ch)
+		  .mix(trimmomaticLogs_ch)
+		  .mix(bt2Logs_ch)
+		  .collect()
+		
+		output:
+		path('multiqc_report.html')
+
+		script:
+		"""
+		multiqc .
+		"""
+	}
+}
+
 notSingleSample = !params.singleSample
-
-
-
-
-process trim {
-    tag "Trimmomatic on ${pair_id}"
-    label 'med_mem'
-
-    input:
-    tuple val(pair_id), path(reads) from reads_ch
-    
-    output:
-    path("${pair_id}_trim.log") into trimmomaticLogs_ch
-    tuple pair_id, path("${pair_id}*.fastq.gz") into trimmedReads_ch, tReadsFqc_ch
-
-	//TODO: add -threads $task.cpus
-	//TODO: look into fastp as alternative trimmer to handle poly-G artefacts
-    script:
-    """
-    trimmomatic PE \
-	  -threads $task.cpus \
-      ${reads[0]} \
-      ${reads[1]} \
-      -baseout ${pair_id}_trim \
-      LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
-    
-    mv ${pair_id}_trim_1P ${pair_id}_trim_R1.fastq
-    mv ${pair_id}_trim_2P ${pair_id}_trim_R2.fastq
-    gzip ${pair_id}_trim_R1.fastq
-    gzip ${pair_id}_trim_R2.fastq
-    """
-}
-
-process fastqc {
-    
-    tag "FASTQC on ${sample_id}"
-    label 'small_mem'
-    
-    input:
-    tuple val(sample_id), path(reads) from tReadsFqc_ch
-
-    output:
-    path("fastqc_${sample_id}_logs") into fastqc_ch
-
-    script:
-    """
-    mkdir fastqc_${sample_id}_logs
-    fastqc -o fastqc_${sample_id}_logs -f fastq -q ${reads}
-    """  
-} 
-
-process bowtieAlign {
-    tag "Aliging $pair_id to ${params.bt2_index}"
-    label 'big_mem'
-
-    input:
-    val(idx) from params.bt2_index
-    tuple val(pair_id), path(reads) from trimmedReads_ch
-
-    output:
-    path("${pair_id}_bt2.log") into bt2Logs_ch
-    tuple pair_id, file("${pair_id}_init.bam") into bt2Bam_ch
-
-	//TODO: add -p $task.cpus
-    script:
-    """
-    bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
-    """
-
-}
-
-
-process filterPrimaryAln {
-
-    tag "Filtering ${sampleID}"
-    publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
-    label 'big_mem'
-
-    input:
-    path(blacklist) from params.blacklist
-    tuple val(sampleID), path(bam) from bt2Bam_ch
-
-    output:
-    path("${sampleID}_idxstats.log") into idxstats_ch
-    path("${sampleID}_insertSizes.log") into picardISStats_ch
-    path("${sampleID}_dups.log") into picardDupStats_ch
-    tuple sampleID, file("${sampleID}_final.bam") into finalBam_ch
-    file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
-    val(sampleID) into names_ch
-    
-	//TODO: modify script for CLI arg $4 to be $task.cpus
-    script:
-    """
-    processAln.sh ${sampleID} ${bam} ${blacklist} ${task.cpus}
-    """
-
-}
-
 
 if (notSingleSample) {
     process  plotPCA {
@@ -237,27 +470,7 @@ if (notSingleSample) {
 }
 
 
-process makeBigwig{
 
-    tag "Creating ${sampleID} bigwig"
-    publishDir "$params.outdir/$sampleID", mode: 'copy'
-    label 'big_mem'
-
-    input:
-    tuple val(sampleID), file(finalBam) from finalBam_ch
-    
-    output:
-    tuple val(sampleID), file("${sampleID}_CPMnorm.bw") into bigwig_ch, bigwig2_ch, bigwig3_ch
-    val(sampleID) into labels_ch
-    file("${sampleID}_CPMnorm.bw") into forGEnrichPlot_ch
-
-	//TODO: add -p $task.cpus
-    script:
-    """
-    sambamba index $finalBam
-    bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --extendReads --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
-    """
-}
 
 process computeMatrixDefault {
     tag "${sampleID} generating gene-wide TSS and GB profile matrices"
@@ -334,34 +547,7 @@ process makeGlobalEnrichPlots {
 
 
 
-BEFPDF_ch = names_ch.toSortedList()
-sortedNamedBam = forBEPImage_ch.toSortedList()
 
-
-process generateGlobalFragmentPDF {
-    tag "Creating Summary Fragment Histograms"
-    publishDir "$params.outdir/results", mode: 'copy'
-    label 'med_mem'
-
-    input:
-    path(files) from sortedNamedBam
-    val(labels) from BEFPDF_ch
-    val(name) from params.name
-
-    output:
-    file( "${name}_PEFragHist-all.pdf" )
-    
-	//TODO: add -p $task.cpus
-    script:
-    """
-    for i in $files; do
-      sambamba index \$i
-    done
-    bamPEFragmentSize -p $task.cpus -b ${files} -o ${name}_PEFragHist-all.pdf --samplesLabel ${labels}
-    """
-
-
-}
 
 
 if(params.addBEDFilesProfile) {
@@ -512,28 +698,3 @@ if(params.addBEDFilesRefPoint) {
     }
 
 }    
-
-
-
-process multiqc {
-    publishDir "$params.outdir/results", mode:'copy'
-    label 'small_mem'
-
-    input:
-    path('*') from fastqc_ch
-      .mix(idxstats_ch)
-      .mix(picardISStats_ch)
-      .mix(picardDupStats_ch)
-      .mix(trimmomaticLogs_ch)
-      .mix(bt2Logs_ch)
-      .collect()
-    
-    output:
-    path('multiqc_report.html')
-
-    script:
-    """
-    multiqc .
-    """
-}
-
