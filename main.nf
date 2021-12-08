@@ -133,6 +133,9 @@ if(params.catLanes) {
       .set {reads_ch}
 }
 
+notSingleSample = !params.singleSample
+
+
 
 if(params.singleEnd){
 	process trimSE {
@@ -246,6 +249,38 @@ if(params.singleEnd){
 		bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
 		"""
 	}
+	
+	if (notSingleSample) {
+		process  plotPCASE {
+			tag "Creating bin-based Multi-Bam Summary"
+			publishDir "$params.outdir/results", mode: 'copy'
+		label 'massive_mem'
+		
+			input:
+			path(files) from forPCA_ch.collect()
+			val(name) from params.name
+			val(pcaTitle) from params.PCATitle
+
+			output:
+			file("${name}_PCA.png") into results_ch
+
+			//TODO: add -p $task.cpus
+			script:
+			"""
+			for i in ${files}
+			do
+			  sambamba index \$i
+			done
+			multiBamSummary bins -p $task.cpus -b $files -o ${name}_matrix.npz --smartLabels 
+			plotPCA \
+			  -in ${name}_matrix.npz \
+			  -o ${name}_PCA.png \
+			  -T "$pcaTitle"
+			"""
+
+		}
+	}
+
 
 
 
@@ -412,33 +447,8 @@ if(params.singleEnd){
 		bamPEFragmentSize -p $task.cpus -b ${files} -o ${name}_PEFragHist-all.pdf --samplesLabel ${labels}
 		"""
 	}
-
-	process multiqc {
-		publishDir "$params.outdir/results", mode:'copy'
-		label 'small_mem'
-
-		input:
-		path('*') from fastqc_ch
-		  .mix(idxstats_ch)
-		  .mix(picardISStats_ch)
-		  .mix(picardDupStats_ch)
-		  .mix(trimmomaticLogs_ch)
-		  .mix(bt2Logs_ch)
-		  .collect()
-		
-		output:
-		path('multiqc_report.html')
-
-		script:
-		"""
-		multiqc .
-		"""
-	}
-}
-
-notSingleSample = !params.singleSample
-
-if (notSingleSample) {
+	
+	if (notSingleSample) {
     process  plotPCA {
         tag "Creating bin-based Multi-Bam Summary"
         publishDir "$params.outdir/results", mode: 'copy'
@@ -465,9 +475,34 @@ if (notSingleSample) {
           -o ${name}_PCA.png \
           -T "$pcaTitle"
         """
+		}
+	}
 
-    }
+	process multiqc {
+		publishDir "$params.outdir/results", mode:'copy'
+		label 'small_mem'
+
+		input:
+		path('*') from fastqc_ch
+		  .mix(idxstats_ch)
+		  .mix(picardISStats_ch)
+		  .mix(picardDupStats_ch)
+		  .mix(trimmomaticLogs_ch)
+		  .mix(bt2Logs_ch)
+		  .collect()
+		
+		output:
+		path('multiqc_report.html')
+
+		script:
+		"""
+		multiqc .
+		"""
+	}
 }
+
+
+
 
 
 
