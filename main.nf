@@ -206,7 +206,7 @@ if(params.singleEnd){
 	process filterPrimaryAlnSE {
 
 		tag "Filtering ${sampleID}"
-		publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
+		publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "*.bam"
 		label 'big_mem'
 
 		input:
@@ -231,7 +231,7 @@ if(params.singleEnd){
 	process makeBigwigSE{
 
 		tag "Creating ${sampleID} bigwig"
-		publishDir "$params.outdir/$sampleID", mode: 'copy'
+		publishDir "$params.outdir/bigwig", mode: 'copy'
 		label 'big_mem'
 
 		input:
@@ -376,7 +376,7 @@ if(params.singleEnd){
 	process filterPrimaryAln {
 
 		tag "Filtering ${sampleID}"
-		publishDir "$params.outdir/$sampleID", mode: 'copy', pattern: "*.bam"
+		publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "*.bam"
 		label 'big_mem'
 
 		input:
@@ -402,7 +402,7 @@ if(params.singleEnd){
 	process makeBigwig{
 
 		tag "Creating ${sampleID} bigwig"
-		publishDir "$params.outdir/$sampleID", mode: 'copy'
+		publishDir "$params.outdir/bigwig", mode: 'copy'
 		label 'big_mem'
 
 		input:
