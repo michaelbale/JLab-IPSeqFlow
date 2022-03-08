@@ -23,7 +23,7 @@ Author: Michael J. Bale (mib4004@med.cornell.edu)
 
 The typical command for running the pipeline is as follows:
 
-`nextflow run michaelbale/JLab-Flow --input 'project/*_R{1,2}.fastq.gz' --genome mouse -profile singularity`
+`nextflow run michaelbale/JLab-IPSeqFlow --input 'project/*_R{1,2}.fastq.gz' --genome mouse -profile singularity`
 
 Mandatory arguments:
 ```
