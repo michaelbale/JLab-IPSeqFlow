@@ -132,6 +132,7 @@ if(params.catLanes) {
 	if(params.singleEnd) {
 	  Channel
 		.fromPath(params.input)
+		.map { path -> tuple(getSampleID(path.getName()), path) }
 		.set {reads_ch}
 	} else{
 	
