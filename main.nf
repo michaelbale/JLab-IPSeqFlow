@@ -128,9 +128,17 @@ if(params.catLanes) {
 	  }
 	}
 } else {
-    Channel
-      .fromFilePairs(params.input)
-      .set {reads_ch}
+	
+	if(params.singleEnd) {
+	  Channel
+		.fromPath(params.input)
+		.set {reads_ch}
+	} else{
+	
+		Channel
+		  .fromFilePairs(params.input)
+		  .set {reads_ch}
+	}
 }
 
 notSingleSample = !params.singleSample
