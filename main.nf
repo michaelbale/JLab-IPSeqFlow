@@ -65,14 +65,12 @@ log.info """\
         """
          .stripIndent()
 		 
-getSampleID = {
-	    (it =~ /(.+)_S\d+_L\d{3}/)[0][1]
-	}
-
 		 
 if(params.catLanes) {
 
-    
+    getSampleID = {
+	    (it =~ /(.+)_S\d+_L\d{3}/)[0][1]
+	}
     
 	if(params.singleEnd) {
 	
@@ -132,6 +130,9 @@ if(params.catLanes) {
 } else {
 	
 	if(params.singleEnd) {
+	    getSampleID = {
+	    (it =~ /(.+)_.+.gz/)[0][1]
+		}	
 	  Channel
 		.fromPath(params.input)
 		.map { path -> tuple(getSampleID(path.getName()), path) }
