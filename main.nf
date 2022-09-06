@@ -64,6 +64,8 @@ log.info """\
         Publish Directory: ${params.outdir}
         """
          .stripIndent()
+
+/*
 		 
     getSampleID = {
 	    (it =~ /(.+)_S\d+_L\d{3}/)[0][1]
@@ -76,7 +78,7 @@ log.info """\
 	getTargetID = {
 	  (it =~ /^.+-(.+)_S\d+_L\d{3}$/))[0][1]
 	}
-	
+*/	
 if(params.catLanes) {
 
 
