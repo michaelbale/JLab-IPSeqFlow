@@ -81,7 +81,9 @@ log.info """\
 */	
 if(params.catLanes) {
 
-
+    getSampleID = {
+        (it =~ /(.+)_S\d+_L\d{3}/)[0][1]
+    }
     
 	if(params.singleEnd) {
 	
