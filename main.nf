@@ -217,40 +217,77 @@ if(params.singleEnd){
 
 		output:
 		path("${pair_id}_bt2.log") into bt2Logs_ch
-		tuple pair_id, file("${pair_id}_init.bam") into bt2Bam_ch
+		tuple pair_id, file("${pair_id}_iSort.bam"), file("${pair_id}_iSort.bam.bai") into bt2Bam_ch
 
-		//TODO: add -p $task.cpus
 		script:
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -U ${reads} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -p --out ${pair_id}_iSort.bam /dev/stdin
+		samtools index ${pair_id}_iSort.bam
 		"""
 
 	}
 
 
-	process filterPrimaryAlnSE {
+	process rmDupSE {
+	   tag "Removing Dupes ${sampleID}"
+	   label 'med_mem'
+	   
+	   input:
+	   tuple val(sampleID), path(bam), path(index) from_bt2Bam_ch
+	   
+	   output:
+	   path("${sampleID}_dups.log") into picardDupStats_ch
+	   tuple sampleID, file("${sampleID}_rmDup.bam") into rmDupBam_ch, idxStats_ch
+	   
+	   script:
+	   """
+	   picard MarkDuplicates VERBOSITY=WARNING \
+		INPUT=${bam} OUTPUT=${sampleID}_rmDup.bam \
+		METRICS_FILE=${sampleID}_dups.log \
+		REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
+	   """
+	}
 
-		tag "Filtering ${sampleID}"
-		publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "*.bam"
-		label 'big_mem'
+	process getIDXStatsSE {
+	   tag "get mapping stats"
+	   label 'small_mem'
+	   
+	   input:
+	   tuple val(sampleID), path(bam) from idxStats_ch
+	   
+	   output:
+	   path("${sampleID}_idxStats.log") into idxLog_ch
+	   
+	   script:
+	   """
+	   sambamba index ${bam}
+	   samtools idxstats ${bam} > ${sampleID}_idxStats.log
+	   """
+	}
 
-		input:
-		path(blacklist) from params.blacklist
-		tuple val(sampleID), path(bam) from bt2Bam_ch
-
-		output:
-		path("${sampleID}_idxstats.log") into idxstats_ch
-		path("${sampleID}_dups.log") into picardDupStats_ch
-		tuple sampleID, file("${sampleID}_final.bam") into finalBam_ch
-		file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
-		val(sampleID) into names_ch
-		
-		//TODO: modify script for CLI arg $4 to be $task.cpus
-		script:
-		"""
-		processAln.sh SE ${sampleID} ${bam} ${blacklist} ${task.cpus}
-		"""
-
+	process finalFilterSE {
+	   tag "Removing chrM and BL"
+	   label 'big_mem'
+	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: <FINALBAM>
+	   
+	   input:
+	   path(blacklist) from params.blacklist
+	   tuple val(sampleID), path(bam) from rmDupBam_ch
+	   
+	   
+	   output:
+	   tuple val(sampleID), file("${sampleID}_final.bam") finalBam_ch
+	   file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
+	   val(sampleID) into names_ch
+	   
+	   script:
+	   """
+	   samtools index ${bam}
+	   export CHROMOSOMES=$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
+	   samtools view -b -h -f 3 -F 4 -F 256 -F 1024 -F 2048 -q 30 ${bam} $CHROMOSOMES > tmp.bam
+	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ 8 - > ${sampleID}_final.bam
+	   """
 	}
 
 	process makeBigwigSE{
@@ -315,7 +352,7 @@ if(params.singleEnd){
 
 		input:
 		path('*') from fastqc_ch
-		  .mix(idxstats_ch)
+		  .mix(idxLog_ch)
 		  .mix(picardDupStats_ch)
 		  .mix(trimmomaticLogs_ch)
 		  .mix(bt2Logs_ch)
@@ -387,41 +424,99 @@ if(params.singleEnd){
 
 		output:
 		path("${pair_id}_bt2.log") into bt2Logs_ch
-		tuple pair_id, file("${pair_id}_init.bam") into bt2Bam_ch
+		tuple pair_id, file("${pair_id}_iSort.bam"), file("${pair_id}_iSort.bam.bai) into bt2Bam_ch
 
 		//TODO: add -p $task.cpus
 		script:
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
+		
+		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -p --out ${pair_id}_iSort.bam /dev/stdin
+		samtools index ${pair_id}_iSort.bam
 		"""
 
 	}
 
 
-	process filterPrimaryAln {
+	process rmDup {
+	   tag "Removing Dupes ${sampleID}"
+	   label 'med_mem'
+	   
+	   input:
+	   tuple val(sampleID), path(bam), path(index) from_bt2Bam_ch
+	   
+	   output:
+	   path("${sampleID}_dups.log") into picardDupStats_ch
+	   tuple sampleID, file("${sampleID}_rmDup.bam") into rmDupBam_ch, idxStats_ch
+	   
+	   script:
+	   """
+	   picard MarkDuplicates VERBOSITY=WARNING \
+		INPUT=${bam} OUTPUT=${sampleID}_rmDup.bam \
+		METRICS_FILE=${sampleID}_dups.log \
+		REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
+	   """
+	}
 
-		tag "Filtering ${sampleID}"
-		publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "*.bam"
-		label 'big_mem'
+	process getIDXStats {
+	   tag "get mapping stats"
+	   label 'small_mem'
+	   
+	   input:
+	   tuple val(sampleID), path(bam) from idxStats_ch
+	   
+	   output:
+	   path("${sampleID}_idxStats.log") into idxLog_ch
+	   
+	   script:
+	   """
+	   sambamba index ${bam}
+	   samtools idxstats ${bam} > ${sampleID}_idxStats.log
+	   """
+	}
 
-		input:
-		path(blacklist) from params.blacklist
-		tuple val(sampleID), path(bam) from bt2Bam_ch
+	process finalFilterPE {
+	   tag "Removing chrM and BL"
+	   label 'big_mem'
+	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: <FINALBAM>
+	   
+	   input:
+	   path(blacklist) from params.blacklist
+	   tuple val(sampleID), path(bam) from rmDupBam_ch
+	   
+	   
+	   output:
+	   tuple val(sampleID), file("${sampleID}_final.bam") into CISM_ch, finalBam_ch
+	   file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
+	   val(sampleID) into names_ch
+	   
+	   script:
+	   """
+	   samtools index ${bam}
+	   export CHROMOSOMES=$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
+	   samtools view -b -h -f 3 -F 4 -F 8 -F 256 -F 1024 -F 2048 -q 30 ${bam} $CHROMOSOMES > tmp.bam
+	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ 8 - > ${sampleID}_final.bam
+	   """
+	}
 
-		output:
-		path("${sampleID}_idxstats.log") into idxstats_ch
-		path("${sampleID}_insertSizes.log") into picardISStats_ch
-		path("${sampleID}_dups.log") into picardDupStats_ch
-		tuple sampleID, file("${sampleID}_final.bam") into finalBam_ch
-		file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
-		val(sampleID) into names_ch
-		
-		//TODO: modify script for CLI arg $4 to be $task.cpus
-		script:
-		"""
-		processAln.sh PE ${sampleID} ${bam} ${blacklist} ${task.cpus}
-		"""
-
+	process collectInserts {
+	   tag "generating Insert Sizes"
+	   label 'big_mem'
+	   
+	   input:
+	   tuple val(sampleID), path(bam) from CISM_ch
+	   
+	   output:
+	   path("${sampleID}_insertSizes.log") into picardISStats_ch
+	   
+	   script:
+	   """
+	   samtools index ${bam}
+	   picard CollectInsertSizeMetrics \
+		I=${bam) \
+		O=${sampleID}_insertSizes.log \
+		H=${sampleID}_insertHist.pdf 
+	   """
 	}
 
 	process makeBigwig{
@@ -509,7 +604,7 @@ if(params.singleEnd){
 
 		input:
 		path('*') from fastqc_ch
-		  .mix(idxstats_ch)
+		  .mix(idxLog_ch)
 		  .mix(picardISStats_ch)
 		  .mix(picardDupStats_ch)
 		  .mix(trimmomaticLogs_ch)
