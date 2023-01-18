@@ -222,7 +222,7 @@ if(params.singleEnd){
 		script:
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -U ${reads} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
-		sambamba sort -t $task.cpus --out ${pair_id}_iSort.bam ${pair_id}_init.bam
+		samtools sort -@ $task.cpus ${pair_id}_init.bam > ${pair_id}_iSort.bam
 		samtools index ${pair_id}_iSort.bam
 		"""
 
@@ -286,7 +286,7 @@ if(params.singleEnd){
 	   samtools index ${bam}
 	   export CHROMOSOMES=\$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
 	   samtools view -b -h -f 3 -F 4 -F 256 -F 1024 -F 2048 -q 30 ${bam} \$CHROMOSOMES > tmp.bam
-	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ 8 - > ${sampleID}_final.bam
+	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ $task.cpus - > ${sampleID}_final.bam
 	   """
 	}
 
@@ -431,7 +431,7 @@ if(params.singleEnd){
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
 		
-		sambamba sort -t $task.cpus --out ${pair_id}_iSort.bam ${pair_id}_init.bam
+		samtools sort -@ $task.cpus ${pair_id}_init.bam > ${pair_id}_iSort.bam
 		samtools index ${pair_id}_iSort.bam
 		"""
 
@@ -495,7 +495,7 @@ if(params.singleEnd){
 	   samtools index ${bam}
 	   export CHROMOSOMES=\$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
 	   samtools view -b -h -f 3 -F 4 -F 8 -F 256 -F 1024 -F 2048 -q 30 ${bam} \$CHROMOSOMES > tmp.bam
-	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ 8 - > ${sampleID}_final.bam
+	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ $task.cpus - > ${sampleID}_final.bam
 	   """
 	}
 
