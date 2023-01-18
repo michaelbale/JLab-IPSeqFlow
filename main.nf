@@ -222,7 +222,7 @@ if(params.singleEnd){
 		script:
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -U ${reads} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
-		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -p --out ${pair_id}_iSort.bam /dev/stdin
+		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -t $task.cpus --out ${pair_id}_iSort.bam /dev/stdin
 		samtools index ${pair_id}_iSort.bam
 		"""
 
@@ -431,7 +431,7 @@ if(params.singleEnd){
 		"""
 		bowtie2 -p $task.cpus -x ${idx} --no-mixed --no-unal --no-discordant --local --very-sensitive-local -X 1000 -k 4 --mm -1 ${reads[0]} -2 ${reads[1]} 2> ${pair_id}_bt2.log | samtools view -bS -q 30 - > ${pair_id}_init.bam
 		
-		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -p --out ${pair_id}_iSort.bam /dev/stdin
+		samtools view -u -q 30 ${pair_id}_init.bam | sambamba sort -t $task.cpus --out ${pair_id}_iSort.bam /dev/stdin
 		samtools index ${pair_id}_iSort.bam
 		"""
 
