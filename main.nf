@@ -234,7 +234,7 @@ if(params.singleEnd){
 	   label 'med_mem'
 	   
 	   input:
-	   tuple val(sampleID), path(bam), path(index) from_bt2Bam_ch
+	   tuple val(sampleID), path(bam), path(index) from bt2Bam_ch
 	   
 	   output:
 	   path("${sampleID}_dups.log") into picardDupStats_ch
@@ -443,7 +443,7 @@ if(params.singleEnd){
 	   label 'med_mem'
 	   
 	   input:
-	   tuple val(sampleID), path(bam), path(index) from_bt2Bam_ch
+	   tuple val(sampleID), path(bam), path(index) from bt2Bam_ch
 	   
 	   output:
 	   path("${sampleID}_dups.log") into picardDupStats_ch
