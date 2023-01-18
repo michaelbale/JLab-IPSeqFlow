@@ -424,7 +424,7 @@ if(params.singleEnd){
 
 		output:
 		path("${pair_id}_bt2.log") into bt2Logs_ch
-		tuple pair_id, file("${pair_id}_iSort.bam"), file("${pair_id}_iSort.bam.bai) into bt2Bam_ch
+		tuple pair_id, file("${pair_id}_iSort.bam"), file("${pair_id}_iSort.bam.bai") into bt2Bam_ch
 
 		//TODO: add -p $task.cpus
 		script:
