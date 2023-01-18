@@ -269,7 +269,7 @@ if(params.singleEnd){
 	process finalFilterSE {
 	   tag "Removing chrM and BL"
 	   label 'big_mem'
-	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: <FINALBAM>
+	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "${sampleID}_final.bam"
 	   
 	   input:
 	   path(blacklist) from params.blacklist
@@ -478,7 +478,7 @@ if(params.singleEnd){
 	process finalFilterPE {
 	   tag "Removing chrM and BL"
 	   label 'big_mem'
-	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: <FINALBAM>
+	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "${sampleID}_final.bam"
 	   
 	   input:
 	   path(blacklist) from params.blacklist
