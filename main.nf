@@ -513,7 +513,7 @@ if(params.singleEnd){
 	   """
 	   samtools index ${bam}
 	   picard CollectInsertSizeMetrics \
-		I=${bam) \
+		I=${bam} \
 		O=${sampleID}_insertSizes.log \
 		H=${sampleID}_insertHist.pdf 
 	   """
