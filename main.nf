@@ -277,7 +277,7 @@ if(params.singleEnd){
 	   
 	   
 	   output:
-	   tuple val(sampleID), file("${sampleID}_final.bam") finalBam_ch
+	   tuple sampleID, file("${sampleID}_final.bam") finalBam_ch
 	   file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
 	   val(sampleID) into names_ch
 	   
