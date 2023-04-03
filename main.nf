@@ -96,19 +96,19 @@ if(params.catLanes) {
 		
 		process catLanesSE {
 		  tag "Concatenating lanes into $params.workDir"
-		  publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: '*.gz'
+		  publishDir "$params.workDir/$pairID", mode: 'copy', pattern: '*.gz'
 		  label 'small_mem'
 		  
 		  input:
-		  tuple val(sampleID), path(r1) from inFq_ch
+		  tuple val(pairID), path(r1) from inFq_ch
 		  
 		  output:
-		  tuple val(sampleID), path("${sampleID}_R1_init.fq.gz") into reads_ch
+		  tuple val(pairID), path("${pairID}_R1_init.fq.gz") into reads_ch
 		  
 		  script:
 		  """
-		  zcat $r1 > ${sampleID}_R1_init.fq
-		  gzip  ${sampleID}_R1_init.fq
+		  zcat $r1 > ${pairID}_R1_init.fq
+		  gzip  ${pairID}_R1_init.fq
 		  """
 		}
 	} else {
@@ -121,22 +121,22 @@ if(params.catLanes) {
 
       process catLanes {
 	    tag "Concatenating lanes into $params.workDir"
-		publishDir "$params.workDir/$sampleID", mode: 'copy', pattern: "*.gz"
+		publishDir "$params.workDir/$pairID", mode: 'copy', pattern: "*.gz"
 		label 'small_mem'
 		
 		input:
-		tuple val(sampleID), path(R1), path(R2) from inFq_ch
+		tuple val(pairID), path(R1), path(R2) from inFq_ch
 				
 		output:
-		tuple val(sampleID), path("${sampleID}_*_init.fq.gz") into reads_ch
+		tuple val(pairID), path("${pairID}_*_init.fq.gz") into reads_ch
 		
 		script:
 		"""
-		zcat $R1 > ${sampleID}_R1_init.fq
-		zcat $R2 > ${sampleID}_R2_init.fq
+		zcat $R1 > ${pairID}_R1_init.fq
+		zcat $R2 > ${pairID}_R2_init.fq
 		
-		gzip ${sampleID}_R1_init.fq
-		gzip ${sampleID}_R2_init.fq
+		gzip ${pairID}_R1_init.fq
+		gzip ${pairID}_R2_init.fq
 		"""
 	  }
 	}
@@ -233,21 +233,21 @@ if(params.singleEnd){
 
 
 	process rmDupSE {
-	   tag "Removing Dupes ${sampleID}"
+	   tag "Removing Dupes ${pairID}"
 	   label 'med_mem'
 	   
 	   input:
-	   tuple val(sampleID), path(bam), path(index) from bt2Bam_ch
+	   tuple val(pairID), path(bam), path(index) from bt2Bam_ch
 	   
 	   output:
-	   path("${sampleID}_dups.log") into picardDupStats_ch
-	   tuple sampleID, file("${sampleID}_rmDup.bam") into rmDupBam_ch, idxStats_ch
+	   path("${pairID}_dups.log") into picardDupStats_ch
+	   tuple pairID, file("${pairID}_rmDup.bam") into rmDupBam_ch, idxStats_ch
 	   
 	   script:
 	   """
 	   picard MarkDuplicates VERBOSITY=WARNING \
-		INPUT=${bam} OUTPUT=${sampleID}_rmDup.bam \
-		METRICS_FILE=${sampleID}_dups.log \
+		INPUT=${bam} OUTPUT=${pairID}_rmDup.bam \
+		METRICS_FILE=${pairID}_dups.log \
 		REMOVE_DUPLICATES=true VALIDATION_STRINGENCY=LENIENT
 	   """
 	}
@@ -257,61 +257,61 @@ if(params.singleEnd){
 	   label 'small_mem'
 	   
 	   input:
-	   tuple val(sampleID), path(bam) from idxStats_ch
+	   tuple val(pairID), path(bam) from idxStats_ch
 	   
 	   output:
-	   path("${sampleID}_idxStats.log") into idxLog_ch
+	   path("${pairID}_idxStats.log") into idxLog_ch
 	   
 	   script:
 	   """
 	   sambamba index ${bam}
-	   samtools idxstats ${bam} > ${sampleID}_idxStats.log
+	   samtools idxstats ${bam} > ${pairID}_idxStats.log
 	   """
 	}
 
 	process finalFilterSE {
 	   tag "Removing chrM and BL"
 	   label 'big_mem'
-	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "${sampleID}_final.bam"
+	   publishDir "$params.outdir/finalBam", mode: 'copy', pattern: "${pairID}_final.bam"
 	   
 	   input:
 	   path(blacklist) from params.blacklist
-	   tuple val(sampleID), path(bam) from rmDupBam_ch
+	   tuple val(pairID), path(bam) from rmDupBam_ch
 	   
 	   
 	   output:
-	   tuple sampleID, file("${sampleID}_final.bam") finalBam_ch
-	   file("${sampleID}_final.bam") into forPCA_ch, forBEPImage_ch
-	   val(sampleID) into names_ch
+	   tuple pairID, file("${pairID}_final.bam") finalBam_ch
+	   file("${pairID}_final.bam") into forPCA_ch, forBEPImage_ch
+	   val(pairID) into names_ch
 	   
 	   script:
 	   """
 	   samtools index ${bam}
 	   export CHROMOSOMES=\$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
 	   samtools view -b -h -f 3 -F 4 -F 256 -F 1024 -F 2048 -q 30 ${bam} \$CHROMOSOMES > tmp.bam
-	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ $task.cpus - > ${sampleID}_final.bam
+	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ $task.cpus - > ${pairID}_final.bam
 	   """
 	}
 
 	process makeBigwigSE{
 
-		tag "Creating ${sampleID} bigwig"
+		tag "Creating ${pairID} bigwig"
 		publishDir "$params.outdir/bigwig", mode: 'copy'
 		label 'big_mem'
 
 		input:
-		tuple val(sampleID), file(finalBam) from finalBam_ch
+		tuple val(pairID), file(finalBam) from finalBam_ch
 		
 		output:
-		tuple val(sampleID), file("${sampleID}_CPMnorm.bw") into bigwig_ch, bigwig2_ch, bigwig3_ch
-		val(sampleID) into labels_ch
-		file("${sampleID}_CPMnorm.bw") into forGEnrichPlot_ch
+		tuple val(pairID), file("${pairID}_CPMnorm.bw") into bigwig_ch, bigwig2_ch, bigwig3_ch
+		val(pairID) into labels_ch
+		file("${pairID}_CPMnorm.bw") into forGEnrichPlot_ch
 
 		//TODO: add -p $task.cpus
 		script:
 		"""
 		sambamba index $finalBam
-		bamCoverage -p $task.cpus --bam ${finalBam} -o ${sampleID}_CPMnorm.bw -bs 10 --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
+		bamCoverage -p $task.cpus --bam ${finalBam} -o ${pairID}_CPMnorm.bw -bs 10 --smoothLength 50 --normalizeUsing CPM --ignoreForNormalization chrX chrY  --skipNonCoveredRegions 
 		"""
 	}
 	
