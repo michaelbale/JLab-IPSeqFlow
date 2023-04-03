@@ -268,7 +268,7 @@ if(params.singleEnd){
 	   samtools idxstats ${bam} > ${pairID}_idxStats.log
 	   """
 	}
-
+/*
 	process finalFilterSE {
 	   tag "Removing chrM and BL"
 	   label 'big_mem'
@@ -368,7 +368,7 @@ if(params.singleEnd){
 		"""
 		multiqc .
 		"""
-	}
+	} */
 } else {
 	process trim {
 		tag "Trimmomatic on ${pair_id}"
