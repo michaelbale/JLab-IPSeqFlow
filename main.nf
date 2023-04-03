@@ -143,8 +143,8 @@ if(params.catLanes) {
 } else {
 	
 	if(params.singleEnd) {
-	    getSampleID = {
-	    (it =~ /(.+)_.+.gz/)[0][1]
+		getSampleID = {
+			(it =~ /(.+)_S\d+_L\d{3}/)[0][1]
 		}	
 	  Channel
 		.fromPath(params.input)
