@@ -180,7 +180,7 @@ if(params.singleEnd){
 		"""
 		trimmomatic SE \
 		  -threads $task.cpus \
-		  ${reads[0]} \
+		  ${reads} \
 		  ${pair_id}_trim_1P \
 		  LEADING:20 TRAILING:20 SLIDINGWINDOW:4:20 2> ${pair_id}_trim.log
 		
