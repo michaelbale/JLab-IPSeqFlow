@@ -149,7 +149,7 @@ if(params.catLanes) {
 	  Channel
 		.fromPath(params.input)
 		.map { path -> tuple(getSampleID(path.getName()), path) }
-		.view()
+		.set {reads_ch}
 	} else{
 	
 		Channel
