@@ -629,7 +629,7 @@ if(params.singleEnd){
 
 
 
-
+/*
 process computeMatrixDefault {
     tag "${sampleID} generating gene-wide TSS and GB profile matrices"
     label 'med_mem'
@@ -856,3 +856,4 @@ if(params.addBEDFilesRefPoint) {
     }
 
 }    
+*/
