@@ -148,7 +148,10 @@ if(params.catLanes) {
 		}	
 	  Channel
 		.fromPath(params.input)
-		.map { path -> tuple(getSampleID(path.getName()), path) }
+		.map { file ->
+			 def sampleName = file.baseName.split('_')[0]
+			 return [sampleName, file]
+			 }
 		.set {reads_ch}
 	} else{
 	
