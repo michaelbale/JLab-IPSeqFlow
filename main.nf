@@ -268,7 +268,7 @@ if(params.singleEnd){
 	   samtools idxstats ${bam} > ${pairID}_idxStats.log
 	   """
 	}
-/*
+
 	process finalFilterSE {
 	   tag "Removing chrM and BL"
 	   label 'big_mem'
@@ -280,7 +280,7 @@ if(params.singleEnd){
 	   
 	   
 	   output:
-	   tuple pairID, file("${pairID}_final.bam") finalBam_ch
+	   tuple pairID, file("${pairID}_final.bam") into finalBam_ch
 	   file("${pairID}_final.bam") into forPCA_ch, forBEPImage_ch
 	   val(pairID) into names_ch
 	   
@@ -368,7 +368,7 @@ if(params.singleEnd){
 		"""
 		multiqc .
 		"""
-	} */
+	} 
 } else {
 	process trim {
 		tag "Trimmomatic on ${pair_id}"
@@ -629,7 +629,7 @@ if(params.singleEnd){
 
 
 
-/*
+
 process computeMatrixDefault {
     tag "${sampleID} generating gene-wide TSS and GB profile matrices"
     label 'med_mem'
@@ -856,4 +856,3 @@ if(params.addBEDFilesRefPoint) {
     }
 
 }    
-*/
