@@ -144,7 +144,7 @@ if(params.catLanes) {
 	
 	if(params.singleEnd) {
 		getSampleID = {
-			(it =~ /(.+)_S\d+_L\d{3}/)[0][1]
+			(it =~ /(.+)_S\d+_L\d{3}_R1_001.fastq.gz/)[0][1]
 		}	
 	  Channel
 		.fromPath(params.input)
