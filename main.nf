@@ -288,7 +288,7 @@ if(params.singleEnd){
 	   """
 	   samtools index ${bam}
 	   export CHROMOSOMES=\$(samtools view -H ${bam} | grep '^@SQ' | cut -f 2 | grep -v -e _ -e chrM -e 'VN:' | sed 's/SN://' | xargs echo)
-	   samtools view -b -h -f 3 -F 4 -F 256 -F 1024 -F 2048 -q 30 ${bam} \$CHROMOSOMES > tmp.bam
+	   samtools view -b -h -F 4 -F 256 -F 1024 -F 2048 -q 30 ${bam} \$CHROMOSOMES > tmp.bam
 	   bedtools subtract -A -a tmp.bam -b ${blacklist} | samtools sort -@ $task.cpus - > ${pairID}_final.bam
 	   """
 	}
